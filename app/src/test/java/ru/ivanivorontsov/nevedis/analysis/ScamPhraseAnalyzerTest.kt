@@ -5,6 +5,23 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ScamPhraseAnalyzerTest {
+    @Test fun guaranteedInvestmentProfitIsHighRisk() {
+        val report = ScamPhraseAnalyzer.analyze("Инвестируйте с гарантией прибыли")
+        assertEquals(ScamPhraseAnalyzer.Level.HIGH, report.level)
+        assertTrue(report.findings.any { it.phrase == "гарантируют прибыль от инвестиций" })
+    }
+
+    @Test fun commonTypoInInvestmentWordIsStillDetected() {
+        val report = ScamPhraseAnalyzer.analyze("Ивестируйте с гарантией прибыли")
+        assertEquals(ScamPhraseAnalyzer.Level.HIGH, report.level)
+        assertTrue(report.findings.any { it.phrase == "гарантируют прибыль от инвестиций" })
+    }
+
+    @Test fun guaranteedInvestmentIncomeWithoutVerbIsDetected() {
+        val report = ScamPhraseAnalyzer.analyze("Гарантированный доход от инвестиций")
+        assertTrue(report.findings.any { it.phrase == "гарантируют прибыль от инвестиций" })
+    }
+
     @Test fun safeAccountIsHighRisk() {
         val report = ScamPhraseAnalyzer.analyze("Срочно переведите деньги на безопасный счёт")
         assertEquals(ScamPhraseAnalyzer.Level.HIGH, report.level)
