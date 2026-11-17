@@ -56,7 +56,13 @@ object ScamPhraseAnalyzer {
         // A warning such as “не сообщайте код из СМС” is protective advice, not a scam request.
         val protectiveAdvice = Regex("(?<![\\p{L}\\p{N}])не\\s+(?:называйте|сообщайте|диктуйте|передавайте)(?![\\p{L}\\p{N}]).{0,30}(?<![\\p{L}\\p{N}])код(?![\\p{L}\\p{N}])")
             .containsMatchIn(text)
-        val filtered = if (protectiveAdvice) findings.filterNot { it.phrase == "код из СМС" || it.phrase == "просят назвать код" } else findings
+        val protectiveTransferAdvice = Regex(
+            "(?<![\\p{L}\\p{N}])не\\s+(?:переводите|переводить|отправляйте|отправлять|перечисляйте|перечислять)(?![\\p{L}\\p{N}]).{0,70}(?:безопасн[\\p{L}]*\\s+сч[её]т|резервн[\\p{L}]*\\s+сч[её]т|защитн[\\p{L}]*\\s+сч[её]т|специальн[\\p{L}]*\\s+сч[её]т)"
+        ).containsMatchIn(text)
+        val filtered = findings.filterNot { finding ->
+            (protectiveAdvice && (finding.phrase == "код из СМС" || finding.phrase == "просят назвать код")) ||
+                (protectiveTransferAdvice && (finding.phrase == "безопасный счёт" || finding.phrase == "перевод на специальный счёт"))
+        }
         val score = filtered.sumOf { it.points }.coerceAtMost(100)
         val level = when {
             score >= 55 -> Level.HIGH
