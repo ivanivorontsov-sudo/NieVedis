@@ -21,6 +21,12 @@ class ScamPhraseAnalyzerTest {
         assertTrue(report.findings.none { it.phrase == "код из СМС" || it.phrase == "просят назвать код" })
     }
 
+    @Test fun protectiveTransferWarningDoesNotTriggerSafeAccountAlert() {
+        val report = ScamPhraseAnalyzer.analyze("Не переводите деньги на безопасный счёт, это обман")
+        assertTrue(report.findings.none { it.phrase == "безопасный счёт" })
+        assertEquals(ScamPhraseAnalyzer.Level.LOW, report.level)
+    }
+
     @Test fun emptyInputIsLowRisk() {
         val report = ScamPhraseAnalyzer.analyze("   ")
         assertEquals(ScamPhraseAnalyzer.Level.LOW, report.level)
