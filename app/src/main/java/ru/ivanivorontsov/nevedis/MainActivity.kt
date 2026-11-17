@@ -97,7 +97,14 @@ private fun NeVedisScreen(onEnableCallScreening: () -> Unit, onVibrate: () -> Un
     val prefs = remember { context.getSharedPreferences(ScamCallScreeningService.PREFS_NAME, 0) }
     val trusted = remember {
         mutableStateListOf<String>().apply {
-            addAll(prefs.getStringSet(ScamCallScreeningService.KEY_TRUSTED_NUMBERS, emptySet()).orEmpty().sorted())
+            addAll(
+                prefs.getStringSet(ScamCallScreeningService.KEY_TRUSTED_NUMBERS, emptySet())
+                    .orEmpty()
+                    .map(::normalizePhoneNumber)
+                    .filter(String::isNotBlank)
+                    .distinct()
+                    .sorted()
+            )
         }
     }
     var numberInput by remember { mutableStateOf("") }
