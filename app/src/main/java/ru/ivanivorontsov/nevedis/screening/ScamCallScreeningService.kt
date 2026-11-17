@@ -10,8 +10,12 @@ class ScamCallScreeningService : CallScreeningService() {
         val rawNumber = callDetails.handle?.schemeSpecificPart.orEmpty()
         val normalized = normalizePhoneNumber(rawNumber)
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        // Normalize stored entries too, so numbers saved by older builds still match.
         val trusted = normalized.isNotBlank() && prefs.getStringSet(KEY_TRUSTED_NUMBERS, emptySet())
-            .orEmpty().contains(normalized)
+            .orEmpty()
+            .asSequence()
+            .map(::normalizePhoneNumber)
+            .any { it == normalized }
 
         if (!trusted) {
             ScamNotifications.showUntrustedCaller(
