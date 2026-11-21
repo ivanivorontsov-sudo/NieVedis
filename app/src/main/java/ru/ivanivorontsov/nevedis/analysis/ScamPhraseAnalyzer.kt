@@ -40,6 +40,12 @@ object ScamPhraseAnalyzer {
         Rule(Regex("(?<![\\p{L}\\p{N}])никому\\s+не\\s+(?:говорите|рассказывайте|сообщайте)(?![\\p{L}\\p{N}])"), "требуют хранить разговор в тайне", "Изоляция от близких помогает мошенникам не дать вам проверить историю.", 30)
     )
 
+    private val matcher by lazy { PhraseMatcher() }
+
+    /** Размер базы фраз — для экрана «О базе». */
+    val databasePhraseCount: Int get() = PhraseDatabase.default.phraseCount + rules.size
+    val databaseCategoryCount: Int get() = PhraseDatabase.default.categories.size
+
     fun analyze(input: String): Report {
         val text = input.lowercase(Locale.ROOT)
             .replace('ё', 'е')
@@ -56,25 +62,45 @@ object ScamPhraseAnalyzer {
 
         // A warning such as “не сообщайте код из СМС” is protective advice, not a scam request.
         val protectiveAdvice = Regex("(?<![\\p{L}\\p{N}])не\\s+(?:называйте|сообщайте|диктуйте|передавайте)(?![\\p{L}\\p{N}]).{0,30}(?<![\\p{L}\\p{N}])код(?![\\p{L}\\p{N}])")
-            .containsMatchIn(text)
+            .containsMatchIn(text) ||
+            // «Код 1234. Никому не сообщайте его» — стандартная приписка в настоящих СМС банков.
+            Regex("(?<![\\p{L}\\p{N}])код(?![\\p{L}\\p{N}]).{0,40}(?:никому\\s+)?не\\s+(?:сообщайте|называйте|говорите|передавайте|диктуйте)(?![\\p{L}\\p{N}])")
+                .containsMatchIn(text)
         val protectiveTransferAdvice = Regex(
             "(?<![\\p{L}\\p{N}])не\\s+(?:переводите|переводить|отправляйте|отправлять|перечисляйте|перечислять)(?![\\p{L}\\p{N}]).{0,70}(?:безопасн[\\p{L}]*\\s+сч[её]т|резервн[\\p{L}]*\\s+сч[её]т|защитн[\\p{L}]*\\s+сч[её]т|специальн[\\p{L}]*\\s+сч[её]т)"
         ).containsMatchIn(text)
         val filtered = findings.filterNot { finding ->
             (protectiveAdvice && (finding.phrase == "код из СМС" || finding.phrase == "просят назвать код")) ||
-                (protectiveTransferAdvice && (finding.phrase == "безопасный счёт" || finding.phrase == "перевод на специальный счёт"))
+                (protectiveTransferAdvice && (finding.phrase == "безопасный счёт" || finding.phrase == "перевод на специальный счёт")) ||
+                (protectiveAdvice && finding.phrase == "требуют хранить разговор в тайне" &&
+                    Regex("никому\\s+не\\s+\\p{L}+(?:\\s+\\p{L}+){0,2}\\s+(?:код|пароль|его)").containsMatchIn(text) ||
+                    Regex("(?:код|пароль)[\\p{L}\\s]{0,40}никому\\s+не").containsMatchIn(text) && finding.phrase == "требуют хранить разговор в тайне")
         }
-        val score = filtered.sumOf { it.points }.coerceAtMost(100)
-        val level = when {
-            score >= 55 -> Level.HIGH
-            score >= 30 -> Level.CAUTION
-            else -> Level.LOW
-        }
+        val legacyScore = filtered.sumOf { it.points }.coerceAtMost(100)
+
+        // Полная база фраз: словоформы, опечатки, сочетания признаков.
+        val db = matcher.match(input)
+        val dbFindings = db.hits.map { hit ->
+            Finding(
+                phrase = hit.category.title,
+                reason = hit.category.reason + " Услышано: «" + hit.fragments.joinToString("», «") + "».",
+                points = hit.score
+            )
+        } + db.combos.map { Finding(it.title, "Сочетание признаков усиливает риск.", it.bonus) }
+
+        val score = (maxOf(legacyScore, db.score) + minOf(legacyScore, db.score) / 3).coerceAtMost(100)
+        val level = levelFor(score)
         val advice = when (level) {
             Level.HIGH -> "ПРЕРВИТЕ РАЗГОВОР. Не переводите деньги и не называйте коды. Позвоните в организацию или родственнику по номеру из своей записной книжки."
             Level.CAUTION -> "Не торопитесь. Завершите разговор и самостоятельно перепроверьте информацию по официальному номеру."
             Level.LOW -> "Явных маркеров из локального списка не найдено. Это не доказывает, что звонок безопасен."
         }
-        return Report(level, score, filtered, advice)
+        return Report(level, score, filtered + dbFindings, advice)
+    }
+
+    fun levelFor(score: Int): Level = when {
+        score >= 55 -> Level.HIGH
+        score >= 30 -> Level.CAUTION
+        else -> Level.LOW
     }
 }

@@ -7,3 +7,7 @@ local.properties
 **/build/
 .externalNativeBuild/
 .cxx/
+app/src/main/assets/vosk-model-small-ru.zip
+*.jks
+*.keystore
+password.txt

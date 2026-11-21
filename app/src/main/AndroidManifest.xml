@@ -1,7 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Состояние звонка (идёт / завершён), чтобы микрофон работал только во время разговора. -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <!-- Микрофон: запрашивается только во время звонка и только после согласия. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <!-- Проверка входящих СМС на устройстве (необязательно). -->
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+    <!-- Режим «только контакты» (необязательно): проверка, есть ли номер в контактах. -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+
+    <!-- Никакого интернета: даже если библиотека попросит, разрешение удаляется при сборке. -->
+    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove" />
 
     <application
         android:allowBackup="false"
@@ -20,6 +36,15 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".call.CallGuardActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.NeVedis.Dialog" />
+
         <service
             android:name=".screening.ScamCallScreeningService"
             android:exported="true"
@@ -28,5 +53,54 @@
                 <action android:name="android.telecom.CallScreeningService" />
             </intent-filter>
         </service>
+
+        <service
+            android:name=".call.CallListenService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
+
+        <service
+            android:name=".call.GuardAccessibilityService"
+            android:exported="true"
+            android:label="Не ведись — проверка разговора"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service" />
+        </service>
+
+        <service
+            android:name=".sms.MessengerNotificationListener"
+            android:exported="true"
+            android:label="Не ведись — проверка сообщений"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <receiver
+            android:name=".call.CallStateReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.PHONE_STATE" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".sms.SmsReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter>
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".notifications.NotificationActionReceiver"
+            android:exported="false" />
     </application>
 </manifest>
